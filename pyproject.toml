@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "theskepticjudge"
+version = "0.1.0"
+description = "A project for skeptical agent evaluation"
+authors = ["Varshini Balaji"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.14"
+openai = "^1.82.1"
+galileo = {extras = ["openai"], version = "^0.10.0"}
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
