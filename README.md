@@ -28,4 +28,6 @@ Output Screenshots:
 ### Learning Agent:
 <img width="886" alt="image" src="https://github.com/user-attachments/assets/6d4293f0-a6fc-4e01-8d57-4d6b9f631ef0" />
 
+### Learning Agent Evaluation:
+<img width="920" alt="image" src="https://github.com/user-attachments/assets/15bc19fa-a6c6-490e-b32c-dfb7e3e7c40e" />
 
