@@ -16,10 +16,16 @@ The novel metrics deviced and experimented during this project are as follows:
 
 Output Screenshots:
 
+### Restaurant Agent:
+
+<img width="886" alt="image" src="https://github.com/user-attachments/assets/80234095-44ee-431c-a9b8-ade0dc5f7c97" />
+
+### Restaurant Agent Evaluation:
 
 <img width="1096" alt="image" src="https://github.com/user-attachments/assets/f281b132-daed-4b9c-86a7-01423a1ab25a" />
 
 
+### Learning Agent:
 <img width="886" alt="image" src="https://github.com/user-attachments/assets/6d4293f0-a6fc-4e01-8d57-4d6b9f631ef0" />
 
 
