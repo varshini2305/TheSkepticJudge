@@ -5,8 +5,8 @@ import uuid
 import logging
 import json
 import uvicorn
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel, validator, Field
 from pymongo import MongoClient
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
@@ -35,12 +35,42 @@ app = FastAPI()
 
 class RestaurantQuery(BaseModel):
     query: str
-    user_name: str
+    user_id: str
+
+class VisitFeedback(BaseModel):
+    user_id: str
+    restaurant_id: str
+    visited: bool
+    visit_date: str
+    experience_rating: int  # 1-5 scale
+    remarks: str
+
+    @validator('visit_date')
+    def validate_date_format(cls, v):
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+            return v
+        except ValueError:
+            raise ValueError("visit_date must be in YYYY-MM-DD format")
+
+    @validator('experience_rating')
+    def validate_rating(cls, v):
+        if not 1 <= v <= 5:
+            raise ValueError("experience_rating must be between 1 and 5")
+        return v
+
+class FeedbackData(BaseModel):
+    user_id: str
+    restaurant_id: str
+    visited: bool
+    visit_date: str
+    experience_rating: int = Field(ge=1, le=5)
+    remarks: str
 
 @tool
-def get_user_preferences(user_name: str) -> dict:
+def get_user_preferences(user_id: str) -> dict:
     """Get user preferences from the database."""
-    user = users_col.find_one({"name": user_name})
+    user = users_col.find_one({"user_id": user_id})
     if not user:
         return {"error": "User not found"}
     
@@ -111,25 +141,37 @@ def fusion_ai_api(query: str, chat_id: Optional[str] = None) -> dict:
         logger.exception("error traceback as follows...")
         return {"error": error_msg}
 
+
 @tool
-def update_user_history(user_name: str, restaurant_name: str) -> bool:
-    """Update user's restaurant history."""
+def update_visit_feedback(feedback: dict) -> bool:
+    """Update user's restaurant visit history with feedback about their experience."""
     try:
+        # Prepare update data
+        update_data = {
+            "restaurant_id": feedback["restaurant_id"],
+            "visited": feedback["visited"],
+            "visit_date": feedback["visit_date"],
+            "experience_rating": feedback["experience_rating"],
+            "remarks": feedback["remarks"],
+            "feedback_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        # Update user's history
         users_col.update_one(
-            {"name": user_name},
+            {"user_id": feedback["user_id"]},
             {
                 "$push": {
-                    "history": {
-                        "restaurant_name": restaurant_name,
-                        "last_visited": datetime.now().strftime("%Y-%m-%d"),
-                        "feedback": None  # Will be updated when user provides feedback
-                    }
+                    "history": update_data
                 }
             }
         )
+        
+        # Log the update
+        logger.info(f"Updated visit feedback for user {feedback['user_id']} and restaurant {feedback['restaurant_id']}")
         return True
+        
     except Exception as e:
-        logger.error(f"Error updating history: {str(e)}")
+        logger.error(f"Error updating visit feedback: {str(e)}")
         return False
 
 # Initialize OpenAI model
@@ -174,7 +216,7 @@ prompt = ChatPromptTemplate.from_messages([
 ])
 
 # Initialize tools
-tools = [get_user_preferences, fusion_ai_api, update_user_history]
+tools = [get_user_preferences, fusion_ai_api, update_visit_feedback]
 # Initialize the agent
 agent = create_tool_calling_agent(llm, tools=tools, prompt=prompt)
 # Initialize AgentExecutor
@@ -185,7 +227,7 @@ async def recommend_restaurants(req: RestaurantQuery):
     """Get restaurant recommendations based on user query and preferences."""
     try:
         # Get user preferences
-        preferences = get_user_preferences.invoke(req.user_name)
+        preferences = get_user_preferences.invoke(req.user_id)
         if "error" in preferences:
             raise HTTPException(status_code=404, detail=preferences["error"])
         
@@ -230,18 +272,79 @@ async def recommend_restaurants(req: RestaurantQuery):
         else:
             # Use the initial response if no chat_id was provided
             response = initial_response
-        
-        # Process the response
+
         try:
-            # Update history with the first recommendation if available
-            if isinstance(response, dict) and "recommendations" in response and response["recommendations"]:
-                first_rec = response["recommendations"][0]
-                update_user_history.invoke(req.user_name, first_rec["name"])
-            return response
+            # Extract restaurants from the response
+            restaurants = []
+            if isinstance(response, dict) and "entities" in response:
+                for entity in response.get("entities", []):
+                    for biz in entity.get("businesses", []):
+                        loc = biz.get("location", {})
+                        restaurants.append({
+                            "name": biz.get("name"),
+                            "city": loc.get("city"),
+                            "state": loc.get("state"),
+                            "address": loc.get("formatted_address"),
+                            "rating": biz.get("rating"),
+                            "price": biz.get("price"),
+                            "categories": [cat.get("title") for cat in biz.get("categories", [])]
+                        })
+            
+            if restaurants:
+                return {
+                    "restaurants": restaurants,
+                    "summary": response.get("response", {}).get("text", "")
+                }
+            else:
+                return response.get("response", {}).get("text", "")
+                
         except Exception as e:
-            error_msg = f"Error processing response: {str(e)}"
-            logger.exception("error traceback as follows...")
-            raise HTTPException(status_code=500, detail=error_msg)
+            logger.exception("Error parsing response: %s", str(e))
+            # Return the raw response text if parsing fails
+            return response.get("response", {}).get("text", str(response))
+        
+    except Exception as e:
+        error_msg = str(e)
+        logger.exception("error traceback as follows...")
+        raise HTTPException(status_code=500, detail=error_msg)
+
+@app.post("/recommend/visit-feedback")
+async def record_visit_feedback(request: Request):
+    """Record user's feedback about their restaurant visit."""
+    try:
+        # Get raw JSON data
+        feedback = await request.json()
+        
+        # Prepare update data
+        update_data = {
+            "restaurant_id": feedback["restaurant_id"],
+            "visited": feedback["visited"],
+            "visit_date": feedback["visit_date"],
+            "experience_rating": feedback["experience_rating"],
+            "remarks": feedback["remarks"],
+            "feedback_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        # Update user's history directly
+        result = users_col.update_one(
+            {"user_id": feedback["user_id"]},
+            {
+                "$push": {
+                    "history": update_data
+                }
+            }
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update visit feedback"
+            )
+            
+        return {
+            "status": "success",
+            "message": "Visit feedback recorded successfully"
+        }
         
     except Exception as e:
         error_msg = str(e)

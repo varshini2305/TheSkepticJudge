@@ -26,3 +26,16 @@ curl -X POST http://localhost:8001/learn \
       }'
 ```
 
+Testing /recommed/visit-feedback
+```
+curl -X POST http://localhost:8000/recommend/visit-feedback \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_name": "Alice Smith",
+    "restaurant_name": "DIN95051",
+    "visited": true,
+    "visit_date": "31-05-2025",
+    "experience_rating": 4,
+    "remarks": "Great experience!"
+  }'
+```
