@@ -22,7 +22,7 @@ curl -X POST http://localhost:8001/learn \
   -H "Content-Type: application/json" \
   -d '{
         "query": "explain the main topics related to distributed middleware",
-        "user_name": "Aiden"
+        "user_id": "aiden"
       }'
 ```
 
