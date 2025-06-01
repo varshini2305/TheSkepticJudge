@@ -6,6 +6,7 @@ import logging
 import json
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, validator, Field
 from pymongo import MongoClient
 from langchain_openai import ChatOpenAI
@@ -14,6 +15,7 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.tools import tool
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from agent_evaluator import AgentEvaluator, ActionType
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -30,8 +32,20 @@ mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[RESTAURANT_DB]
 users_col = db["user_info"]
 
+# Initialize evaluator for restaurant agent
+evaluator = AgentEvaluator("restaurant_agent")
+
 # Initialize FastAPI
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3001"],  # Frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class RestaurantQuery(BaseModel):
     query: str
@@ -226,8 +240,17 @@ agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 async def recommend_restaurants(req: RestaurantQuery):
     """Get restaurant recommendations based on user query and preferences."""
     try:
+        # Start tracking request
+        evaluator.latency_tracker.start_action(ActionType.MODEL_INFERENCE, {"query": req.query})
+        
         # Get user preferences
+        evaluator.latency_tracker.start_action(ActionType.TOOL_USAGE, {"tool": "get_user_preferences", "user_id": req.user_id})
         preferences = get_user_preferences.invoke(req.user_id)
+        evaluator.latency_tracker.end_action(
+            success="error" not in preferences,
+            output=preferences
+        )
+        
         if "error" in preferences:
             raise HTTPException(status_code=404, detail=preferences["error"])
         
@@ -240,7 +263,13 @@ async def recommend_restaurants(req: RestaurantQuery):
         I prefer {preferences['general_preference']}."""
         
         # Make initial API call
+        evaluator.latency_tracker.start_action(ActionType.TOOL_USAGE, {"tool": "fusion_ai_api", "query": initial_query})
         initial_response = fusion_ai_api.invoke({"query": initial_query})
+        evaluator.latency_tracker.end_action(
+            success="error" not in initial_response,
+            output=initial_response
+        )
+        
         if "error" in initial_response:
             raise HTTPException(status_code=500, detail=initial_response["error"])
             
@@ -248,60 +277,65 @@ async def recommend_restaurants(req: RestaurantQuery):
         if "chat_id" in initial_response:
             chat_id = initial_response["chat_id"]
             logger.info(f"Received chat_id: {chat_id}")
-            
-            # Make follow-up query with preferences
-            follow_up_query = f"""Based on my preferences:
+        
+        # Prepare input for the agent
+        input_data = {
+            "input": f"""User query: {req.query}
+            User preferences:
+            - Location: {preferences['location']}
             - Food types: {', '.join(preferences['food_type'])}
             - Allergies: {', '.join(preferences['allergies'])}
             - Budget: {preferences['budget_range']}
             - General preference: {preferences['general_preference']}
-            - Recently visited: {', '.join([h['restaurant_name'] for h in preferences['history'][-3:]])}
             
-            Please refine the recommendations to better match these preferences."""
-            
-            # Make follow-up API call with chat_id
-            refined_response = fusion_ai_api.invoke({
-                "query": follow_up_query,
-                "chat_id": chat_id
-            })
-            if "error" in refined_response:
-                raise HTTPException(status_code=500, detail=refined_response["error"])
-                
-            # Use the refined response
-            response = refined_response
-        else:
-            # Use the initial response if no chat_id was provided
-            response = initial_response
-
+            Initial API response:
+            {json.dumps(initial_response, indent=2)}
+            """
+        }
+        
+        # Get response from agent
+        evaluator.latency_tracker.start_action(ActionType.MODEL_INFERENCE, {"input": input_data})
+        agent_response = agent_executor.invoke(input_data)
+        evaluator.latency_tracker.end_action(success=True, output=agent_response)
+        
+        # Parse the response to ensure it's in the correct format
         try:
-            # Extract restaurants from the response
-            restaurants = []
-            if isinstance(response, dict) and "entities" in response:
-                for entity in response.get("entities", []):
-                    for biz in entity.get("businesses", []):
-                        loc = biz.get("location", {})
-                        restaurants.append({
-                            "name": biz.get("name"),
-                            "city": loc.get("city"),
-                            "state": loc.get("state"),
-                            "address": loc.get("formatted_address"),
-                            "rating": biz.get("rating"),
-                            "price": biz.get("price"),
-                            "categories": [cat.get("title") for cat in biz.get("categories", [])]
-                        })
-            
-            if restaurants:
-                return {
-                    "restaurants": restaurants,
-                    "summary": response.get("response", {}).get("text", "")
-                }
+            # First try to get the output from the agent response
+            if isinstance(agent_response, dict) and "output" in agent_response:
+                response_text = agent_response["output"]
+                try:
+                    # Try to parse the output as JSON
+                    response = json.loads(response_text)
+                except json.JSONDecodeError:
+                    # If not JSON, use the text as is
+                    response = {
+                        "recommendations": [],
+                        "summary": response_text
+                    }
             else:
-                return response.get("response", {}).get("text", "")
-                
+                # If no output field, use the response directly
+                response = agent_response
+            
+            # Ensure we have the required fields
+            final_response = {
+                "recommendations": response.get("recommendations", []),
+                "summary": response.get("summary", str(response) if isinstance(response, str) else "")
+            }
+            
         except Exception as e:
-            logger.exception("Error parsing response: %s", str(e))
-            # Return the raw response text if parsing fails
-            return response.get("response", {}).get("text", str(response))
+            logger.exception("Error parsing agent response")
+            final_response = {
+                "recommendations": [],
+                "summary": str(agent_response)
+            }
+        
+        # Log the request-response pair
+        session_id = evaluator.log_request(
+            query=req.query,
+            response=json.dumps(final_response)
+        )
+        
+        return final_response
         
     except Exception as e:
         error_msg = str(e)
@@ -310,41 +344,38 @@ async def recommend_restaurants(req: RestaurantQuery):
 
 @app.post("/recommend/visit-feedback")
 async def record_visit_feedback(request: Request):
-    """Record user's feedback about their restaurant visit."""
+    """Record user feedback about a restaurant visit."""
     try:
-        # Get raw JSON data
-        feedback = await request.json()
+        # Parse request body
+        feedback_data = await request.json()
         
-        # Prepare update data
-        update_data = {
-            "restaurant_id": feedback["restaurant_id"],
-            "visited": feedback["visited"],
-            "visit_date": feedback["visit_date"],
-            "experience_rating": feedback["experience_rating"],
-            "remarks": feedback["remarks"],
-            "feedback_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
+        # Validate required fields
+        required_fields = ["user_id", "restaurant_id", "visited", "visit_date", "experience_rating", "remarks"]
+        for field in required_fields:
+            if field not in feedback_data:
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
         
-        # Update user's history directly
-        result = users_col.update_one(
-            {"user_id": feedback["user_id"]},
+        # Start tracking feedback update
+        evaluator.latency_tracker.start_action(
+            ActionType.TOOL_USAGE,
             {
-                "$push": {
-                    "history": update_data
-                }
+                "tool": "update_visit_feedback",
+                "user_id": feedback_data["user_id"],
+                "restaurant_id": feedback_data["restaurant_id"]
             }
         )
         
-        if result.modified_count == 0:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to update visit feedback"
-            )
-            
-        return {
-            "status": "success",
-            "message": "Visit feedback recorded successfully"
-        }
+        # Update feedback
+        result = update_visit_feedback.invoke(feedback_data)
+        evaluator.latency_tracker.end_action(
+            success=result,
+            output={"status": "success" if result else "failed"}
+        )
+        
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to update feedback")
+        
+        return {"status": "success", "message": "Feedback recorded"}
         
     except Exception as e:
         error_msg = str(e)
@@ -352,4 +383,4 @@ async def record_visit_feedback(request: Request):
         raise HTTPException(status_code=500, detail=error_msg)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8002)  # Using port 8002 to avoid conflicts

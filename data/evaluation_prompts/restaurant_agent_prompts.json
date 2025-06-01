@@ -1,0 +1,22 @@
+{
+  "clarity": {
+    "prompt": "Evaluate how clear and understandable the restaurant recommendation is. Consider:        1. Is the language simple and accessible?        2. Are restaurant-related terms explained clearly?        3. Is the recommendation presented in a structured way?        4. Are the reasons for the recommendation concrete and relatable?        5. Is the response free from unnecessary jargon or complex culinary terms?                Score from 0 to 1, where:        0 = Confusing, uses complex language, or lacks clear explanations        0.5 = Somewhat clear but could be simplified        1 = Crystal clear with appropriate language and explanations                Return only the score as a float.",
+    "description": "Clarity means making the restaurant recommendation accessible and understandable to users."
+  },
+  "completeness": {
+    "prompt": "Evaluate how thoroughly the response addresses the user's restaurant needs. Consider:        1. Does it cover all necessary aspects of the request (budget, dietary restrictions, cuisine preferences)?        2. Does it provide appropriate context and details about the recommended restaurant?        3. Does it address potential concerns or questions (e.g., parking, reservation requirements)?        4. Does it include relevant examples or options?        5. Does it connect the information to user's specific needs?                Score from 0 to 1, where:        0 = Missing critical information or aspects        0.5 = Covers main points but lacks depth or details        1 = Comprehensive coverage with appropriate details and connections                Return only the score as a float.",
+    "description": "Completeness means providing comprehensive coverage of the user's restaurant needs while maintaining clarity."
+  },
+  "relevance": {
+    "prompt": "Evaluate how relevant and focused the restaurant recommendation is to the user's request. Consider:        1. Does it directly address the user's specific query?        2. Is the level of detail appropriate for the request?        3. Are examples and options relevant to the user's needs?        4. Does it stay focused on the key requirements?        5. Does it avoid unnecessary information or tangents?                Score from 0 to 1, where:        0 = Off-topic or inappropriate level of detail        0.5 = Somewhat relevant but could be more focused        1 = Perfectly targeted to the user's needs and query                Return only the score as a float.",
+    "description": "Relevance means providing information that is directly applicable to the user's current restaurant needs."
+  },
+  "engagement": {
+    "prompt": "Evaluate how engaging and user-friendly the restaurant recommendation is. Consider:        1. Does it maintain user interest through appropriate pacing?        2. Does it use engaging examples or options?        3. Does it encourage user interaction or feedback?        4. Is the tone appropriate and welcoming?        5. Does it make the information appealing and accessible?                Score from 0 to 1, where:        0 = Passive, dry response with no engagement        0.5 = Some engaging elements but could be more interactive        1 = Highly engaging with user-friendly elements                Return only the score as a float.",
+    "description": "Engagement means actively involving users and maintaining their interest in the restaurant recommendation."
+  },
+  "instruction_following_quality": {
+    "prompt": "Evaluate how well the restaurant recommendation adheres to the specific requirements and constraints. Consider:        1. Does it follow all specified guidelines and protocols?        2. Does it respect user preferences and constraints (e.g., budget, dietary restrictions)?        3. Does it maintain appropriate boundaries and limitations?        4. Does it handle special requirements appropriately (e.g., pet-friendly, child-friendly)?        5. Does it follow all necessary procedures?                Score from 0 to 1, where:        0 = Violates constraints or guidelines        0.5 = Partially follows requirements        1 = Perfectly follows all requirements and constraints                Return only the score as a float.",
+    "description": "Instruction following quality means adhering to specific requirements and constraints while maintaining effectiveness."
+  }
+}

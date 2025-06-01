@@ -1,0 +1,22 @@
+{
+  "clarity": {
+    "prompt": "Evaluate how clear and understandable the agent's teaching response is. Consider:        1. Is the language simple and accessible for a student?        2. Are complex concepts or terms explained clearly?        3. Is the information presented in a structured way that aids learning?        4. Are examples or explanations concrete and relatable to the study material?        5. Is the response free from unnecessary academic jargon?                Score from 0 to 1, where:        0 = Confusing, uses complex language, or lacks clear explanations        0.5 = Somewhat clear but could be simplified        1 = Crystal clear with appropriate language and explanations                Return only the score as a float.",
+    "description": "Clarity means making information accessible and understandable to students."
+  },
+  "completeness": {
+    "prompt": "Evaluate how thoroughly the agent's response addresses the student's learning needs. Consider:        1. Does it cover all necessary aspects of the study material?        2. Does it provide appropriate context and details?        3. Does it address potential concerns or questions a student might have?        4. Does it include relevant examples or options?        5. Does it connect the information to student's specific learning needs?                Score from 0 to 1, where:        0 = Missing critical information or aspects        0.5 = Covers main points but lacks depth or details        1 = Comprehensive coverage with appropriate details and connections                Return only the score as a float.",
+    "description": "Completeness means providing comprehensive coverage of the student's learning needs while maintaining clarity."
+  },
+  "relevance": {
+    "prompt": "Evaluate how relevant and focused the agent's response is to the student's learning request. Consider:        1. Does it directly address the student's specific query?        2. Is the level of detail appropriate for the student's learning level?        3. Are examples and options relevant to the student's study material?        4. Does it stay focused on the key learning objectives?        5. Does it avoid unnecessary information or tangents?                Score from 0 to 1, where:        0 = Off-topic or inappropriate level of detail        0.5 = Somewhat relevant but could be more focused        1 = Perfectly targeted to the student's needs and query                Return only the score as a float.",
+    "description": "Relevance means providing information that is directly applicable to the student's current learning needs."
+  },
+  "engagement": {
+    "prompt": "Evaluate how engaging and user-friendly the agent's teaching response is. Consider:        1. Does it maintain student interest through appropriate pacing?        2. Does it use engaging examples or options?        3. Does it encourage student interaction or feedback?        4. Is the tone appropriate and welcoming for a learning environment?        5. Does it make the learning material appealing and accessible?                Score from 0 to 1, where:        0 = Passive, dry response with no engagement        0.5 = Some engaging elements but could be more interactive        1 = Highly engaging with user-friendly elements                Return only the score as a float.",
+    "description": "Engagement means actively involving students and maintaining their interest in the learning process."
+  },
+  "instruction_following_quality": {
+    "prompt": "Evaluate how well the agent's response adheres to the specific teaching requirements and constraints. Consider:        1. Does it follow all specified teaching guidelines and protocols?        2. Does it respect student preferences and constraints?        3. Does it maintain appropriate boundaries and limitations in the learning process?        4. Does it handle special learning requirements appropriately?        5. Does it follow all necessary teaching procedures?                Score from 0 to 1, where:        0 = Violates constraints or guidelines        0.5 = Partially follows requirements        1 = Perfectly follows all requirements and constraints                Return only the score as a float.",
+    "description": "Instruction following quality means adhering to specific teaching requirements and constraints while maintaining effectiveness."
+  }
+}
