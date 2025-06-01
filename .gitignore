@@ -3,4 +3,3 @@ config.yaml
 *.pyc
 __pycache__/learning_agent.cpython-311.pyc
 __pycache__/restaurant_agent.cpython-311.pyc
-__pycache__/learning_agent.cpython-311.pyc
