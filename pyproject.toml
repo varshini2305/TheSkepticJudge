@@ -6,7 +6,7 @@ authors = ["Varshini Balaji"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.14"
+python = ">=3.11,<3.13"
 openai = "^1.82.1"
 galileo = {extras = ["openai"], version = "^0.10.0"}
 pyyaml = "^6.0.2"
@@ -24,6 +24,9 @@ numpy = "^2.2.6"
 sentence-transformers = "^4.1.0"
 einops = "^0.8.1"
 tqdm = "^4.67.1"
+langchain = "^0.3.25"
+langchain-openai = "^0.3.18"
+langchain-core = "^0.3.63"
 
 
 [build-system]
